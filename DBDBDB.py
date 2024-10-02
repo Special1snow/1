@@ -1,9 +1,13 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import os
 
-# Ensure Seaborn is imported according to the provided version in requirements.txt
+# Configure matplotlib to use 'Agg' backend
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+# Ensure Seaborn is imported
 try:
     import seaborn as sns
     seaborn_imported = True
