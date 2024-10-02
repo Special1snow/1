@@ -1,5 +1,6 @@
-
 streamlit
 pandas
 seaborn==0.12.2
-matplotlib
+matplotlib==3.7.1
+openpyxl
+xlrd
