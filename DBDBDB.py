@@ -26,11 +26,11 @@ data['역할구분 (MPRS)'] = data['역할구분 (MPRS)'].replace({
 # 1. 연도별 Role Distribution (남녀 구분 없이 인원수 표로 보여주기)
 roles = ['Manager', 'Professional', 'Researcher', 'Specialist']
 role_year_distribution = data[data['역할구분 (MPRS)'].isin(roles)].groupby(['년도', '역할구분 (MPRS)']).size().unstack(fill_value=0)
-st.write("### Yearly Role Distribution")
+st.write("### 연도별 MPRS 분포")
 st.dataframe(role_year_distribution)
 
 # 2. 누적 막대그래프 추가 (연도별 Role Distribution을 시각화)
-st.write("### Yearly Role Distribution (Stacked Bar Chart)")
+st.write("### 연도별 MRPS 분포 (누적)")
 fig, ax = plt.subplots()
 role_year_distribution.plot(kind='bar', stacked=True, ax=ax)
 ax.set_xlabel('Year')
@@ -50,11 +50,11 @@ female_ratios = pd.DataFrame()
 for role in roles:
     female_ratios[role] = calculate_female_ratio(data, role)
 
-st.write("### Yearly Female Composition Ratio")
+st.write("### 연도별 여성 구성원 비율")
 st.dataframe(female_ratios)
 
 # 4. 파이차트 추가 (각 Role별로 여성구성원과 남성구성원 비율)
-st.write("### Gender Composition by Role (Pie Chart)")
+st.write("### 연도별 여성 구성원 비율(파이)")
 
 # 각 Role에 대해 여성과 남성 비율 계산
 for role in roles:
