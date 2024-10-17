@@ -1,95 +1,190 @@
-import streamlit as st
-import pandas as pd
-import os
+import React, { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import * as pd from 'pandas-js';
 
-# Configure matplotlib to use 'Agg' backend
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+// CSV 데이터를 가져오는 함수
+const fetchCSVData = async () => {
+  try {
+    const response = await fetch('/api/hr-data'); // API 엔드포인트 가정
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to fetch CSV data:", error);
+    return [];
+  }
+};
 
-# Ensure Seaborn is imported
-try:
-    import seaborn as sns
-    seaborn_imported = True
-except ImportError:
-    seaborn_imported = False
-    st.warning("Seaborn이 설치되지 않았습니다. Heatmap과 같은 시각화가 제한됩니다.")
+const Dashboard = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-# Dashboard title
-st.title('AI를 활용한 HR 대시보드')
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const csvData = await fetchCSVData();
+        setData(csvData);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
-# File upload
-uploaded_file = st.file_uploader("Excel 파일을 업로드하세요", type="xlsx")
+  const processRoleYearDistribution = () => {
+    if (data.length === 0) return [];
+    
+    const df = new pd.DataFrame(data);
+    const grouped = df.groupby(['년도', '역할구분 (MPRS)']).size().reset_index();
+    grouped.columns = ['년도', '역할구분 (MPRS)', 'count'];
+    
+    const pivoted = grouped.pivot({ 
+      index: '년도', 
+      columns: '역할구분 (MPRS)', 
+      values: 'count' 
+    }).reset_index();
+    
+    return pivoted.to_json({ orient: 'records' });
+  };
 
-if uploaded_file is not None:
-    try:
-        # Load the data
-        xls = pd.ExcelFile(uploaded_file)
+  const processFemaleRatios = () => {
+    if (data.length === 0) return [];
+    
+    const df = new pd.DataFrame(data);
+    const total = df.groupby(['년도', '역할구분 (MPRS)']).size().reset_index();
+    total.columns = ['년도', '역할구분 (MPRS)', 'total'];
+    
+    const female = df[df['성별'] === '여'].groupby(['년도', '역할구분 (MPRS)']).size().reset_index();
+    female.columns = ['년도', '역할구분 (MPRS)', 'female'];
+    
+    const merged = total.merge(female, on=['년도', '역할구분 (MPRS)'], how='left');
+    merged['female_ratio'] = (merged['female'] / merged['total']) * 100;
+    
+    const pivoted = merged.pivot({ 
+      index: '년도', 
+      columns: '역할구분 (MPRS)', 
+      values: 'female_ratio' 
+    }).reset_index();
+    
+    return pivoted.to_json({ orient: 'records' });
+  };
 
-        df_skillset = pd.read_excel(xls, '직무별SkillSet')
-        df_self_review = pd.read_excel(xls, 'Self Review')
-        df_education_db = pd.read_excel(xls, '교육DB')
+  const process2024GenderDistribution = () => {
+    if (data.length === 0) return [];
+    
+    const df = new pd.DataFrame(data);
+    const filtered = df[df['년도'] === 2024];
+    const grouped = filtered.groupby(['역할구분 (MPRS)', '성별']).size().reset_index();
+    grouped.columns = ['역할구분 (MPRS)', '성별', 'count'];
+    
+    const pivoted = grouped.pivot({ 
+      index: '역할구분 (MPRS)', 
+      columns: '성별', 
+      values: 'count' 
+    }).reset_index();
+    pivoted.columns = ['name', 'male', 'female'];
+    
+    return pivoted.to_json({ orient: 'records' });
+  };
 
-        # Sidebar for selecting sheets to display
-        option = st.sidebar.selectbox(
-            '어떤 데이터를 탐색하시겠습니까?',
-            ('직무별SkillSet', 'Self Review', '교육DB')
-        )
+  const roleYearDistribution = processRoleYearDistribution();
+  const femaleRatios = processFemaleRatios();
+  const genderDistribution2024 = process2024GenderDistribution();
 
-        if option == '직무별SkillSet':
-            st.header('직무별 SkillSet')
-            
-            st.write("각 부서별 스킬셋 데이터입니다.")
-            
-            # Display dataframe
-            st.dataframe(df_skillset)
-            
-            # Heatmap of skill proficiency across departments
-            st.subheader('부서별 스킬 숙련도 히트맵')
-            
-            if seaborn_imported:
-                fig, ax = plt.subplots(figsize=(10,6))
-                sns.heatmap(df_skillset.iloc[:, 2:], annot=True, cmap="coolwarm", fmt=".1f", ax=ax)
-                st.pyplot(fig)
-            else:
-                st.error("히트맵을 표시하려면 Seaborn이 필요합니다. Seaborn을 설치하세요.")
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
-        elif option == 'Self Review':
-            st.header('자기 평가 (Self Review)')
-            
-            st.write("자기 평가 및 스킬 평가 비교 데이터입니다.")
-            
-            # Display dataframe
-            st.dataframe(df_self_review)
-            
-            # Bar chart: Self review scores vs average department score
-            st.subheader('자기 평가 점수 비교')
-            fig, ax = plt.subplots()
-            df_self_review['Self Review'].plot(kind='bar', ax=ax, color='skyblue', label='자기 평가')
-            df_self_review['환산점수'].plot(kind='bar', ax=ax, color='orange', alpha=0.5, label='환산 점수')
-            ax.legend()
-            st.pyplot(fig)
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
-        elif option == '교육DB':
-            st.header('교육 DB')
-            
-            st.write("교육 및 훈련 데이터 개요입니다.")
-            
-            # Display dataframe
-            st.dataframe(df_education_db)
-            
-            # Bar chart of educational costs across departments
-            st.subheader('부서별 교육 비용')
-            df_education_db_filtered = df_education_db[df_education_db['비용(만원)'] > 0]
-            fig, ax = plt.subplots()
-            df_education_db_filtered.groupby('사업부')['비용(만원)'].sum().plot(kind='bar', ax=ax, color='green')
-            ax.set_ylabel('비용 (만원)')
-            st.pyplot(fig)
-            
-        # Footer
-        st.write("Streamlit을 사용하여 생성된 대시보드입니다.")
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">HR Data Dashboard</h1>
 
-    except Exception as e:
-        st.error(f"파일을 처리하는 중 오류가 발생했습니다: {str(e)}")
-else:
-    st.info("Excel 파일을 업로드해주세요.")
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>연도별 역할 분포</CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={roleYearDistribution}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="년도" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="M" fill="#8884d8" />
+                <Bar dataKey="P" fill="#82ca9d" />
+                <Bar dataKey="R" fill="#ffc658" />
+                <Bar dataKey="S" fill="#ff7300" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>연도별 여성 비율</CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={femaleRatios}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="년도" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="M" fill="#8884d8" />
+                <Bar dataKey="P" fill="#82ca9d" />
+                <Bar dataKey="R" fill="#ffc658" />
+                <Bar dataKey="S" fill="#ff7300" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>2024년 역할별 성별 분포</CardHeader>
+          <CardContent>
+            <div className="flex justify-around">
+              {genderDistribution2024.map((entry, index) => (
+                <div key={entry.name} className="text-center">
+                  <h3 className="font-bold">{entry.name}</h3>
+                  <ResponsiveContainer width={100} height={100}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Male', value: entry.male },
+                          { name: 'Female', value: entry.female }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={50}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {
+                          [{ name: 'Male', value: entry.male }, { name: 'Female', value: entry.female }].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))
+                        }
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div>Male: {entry.male}</div>
+                  <div>Female: {entry.female}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
