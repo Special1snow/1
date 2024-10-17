@@ -6,11 +6,9 @@ import matplotlib.pyplot as plt
 st.title('HR 역할 구분 대시보드')
 
 # CSV 파일 로드
-file_path = 'AI분석해보자.csv'
-
-@st.cache
+@st.cache_data
 def load_data():
-    data = pd.read_csv(file_path)
+    data = pd.read_csv('AI분석해보자.csv')
     return data
 
 data = load_data()
@@ -20,7 +18,6 @@ st.write("### 데이터 미리보기", data.head())
 
 # 연도별 역할 구분에 따른 분포 시각화
 role_year_distribution = data.groupby(['년도', '역할구분 (MPRS)']).size().unstack()
-
 st.write("### 연도별 역할 구분에 따른 분포")
 st.line_chart(role_year_distribution)
 
@@ -34,7 +31,6 @@ def calculate_female_ratio(df, role):
 
 roles = ['M', 'P', 'R', 'S']
 female_ratios = pd.DataFrame()
-
 for role in roles:
     female_ratios[role] = calculate_female_ratio(data, role)
 
@@ -49,3 +45,16 @@ st.write("### 2024년 기준 역할 구분에 따른 성별 분포")
 fig, ax = plt.subplots(1, 4, figsize=(16, 4))
 role_gender_distribution_2024.plot(kind='pie', subplots=True, autopct='%1.1f%%', ax=ax)
 st.pyplot(fig)
+
+# 데이터 다운로드 기능 추가
+@st.cache_data
+def convert_df(df):
+    return df.to_csv().encode('utf-8')
+
+csv = convert_df(data)
+st.download_button(
+    label="Download data as CSV",
+    data=csv,
+    file_name='hr_data.csv',
+    mime='text/csv',
+)
