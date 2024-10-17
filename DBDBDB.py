@@ -14,10 +14,10 @@ def load_data():
 
 data = load_data()
 
-# 1. 연도별 역할 구분에 따른 분포 (남녀 구분 없이 인원수 표로 보여주기) - 2024년 데이터 포함
+# 1. 연도별 MRPS 분포 (남녀 구분 없이 인원수 표로 보여주기) - 2024년 데이터 포함
 roles = ['M', 'P', 'R', 'S']
 role_year_distribution = data[data['역할구분 (MPRS)'].isin(roles)].groupby(['년도', '역할구분 (MPRS)']).size().unstack(fill_value=0)
-st.write("### 연도별 역할 구분에 따른 분포 (남녀 구분 없음)")
+st.write("### 연도별 MPRS 분포")
 st.dataframe(role_year_distribution)
 
 # 2. 연도별 여성 비율 계산 (역할구분을 열로, 년도를 행으로) - 소수점 한자리까지만 표시하고 % 추가
@@ -33,5 +33,5 @@ female_ratios = pd.DataFrame()
 for role in roles:
     female_ratios[role] = calculate_female_ratio(data, role)
 
-st.write("### 연도별 여성 비율 (전체 인원 중 여성 비율)")
+st.write("### 연도별 여성 구성원 비율(%)")
 st.dataframe(female_ratios)
